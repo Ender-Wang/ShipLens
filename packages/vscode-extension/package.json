@@ -1,0 +1,91 @@
+{
+  "name": "shiplens",
+  "displayName": "ShipLens",
+  "description": "See the first release version of every line of code, inline in your editor.",
+  "version": "0.1.0",
+  "publisher": "ender-wang",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "SCM Providers",
+    "Other"
+  ],
+  "keywords": [
+    "git",
+    "blame",
+    "release",
+    "tag",
+    "version"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ender-Wang/ShipLens.git"
+  },
+  "homepage": "https://github.com/Ender-Wang/ShipLens#readme",
+  "bugs": {
+    "url": "https://github.com/Ender-Wang/ShipLens/issues"
+  },
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "configuration": {
+      "title": "ShipLens",
+      "properties": {
+        "shiplens.tagInclude": {
+          "type": "string",
+          "default": "*",
+          "description": "Glob passed to `git tag --contains`. Use `v*` to limit to versioned tags, or a project-specific prefix (e.g. `frontend-v*`)."
+        },
+        "shiplens.tagExclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["*-rc*", "*-beta*", "*-alpha*", "*-pre*", "*-dev*", "*-snapshot*"],
+          "description": "Glob patterns for tags to ignore when picking the first release (typically pre-releases)."
+        },
+        "shiplens.sortBy": {
+          "type": "string",
+          "enum": ["committerDate", "tagDate", "topological", "semver"],
+          "default": "committerDate",
+          "description": "How candidate tags are ordered. v0.1 only implements `committerDate`; other values fall back to it."
+        },
+        "shiplens.debounceMs": {
+          "type": "number",
+          "default": 150,
+          "minimum": 0,
+          "maximum": 2000,
+          "description": "Delay between cursor movement and the next query."
+        },
+        "shiplens.followRenames": {
+          "type": "boolean",
+          "default": false,
+          "description": "Pass `--follow` to `git blame`. Off by default — it costs latency on rename-heavy histories."
+        },
+        "shiplens.statusBar.alignment": {
+          "type": "string",
+          "enum": ["left", "right"],
+          "default": "right",
+          "description": "Where to place the ShipLens status bar item."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.config.mjs",
+    "watch": "node esbuild.config.mjs --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package": "vsce package --no-dependencies",
+    "install:vsix": "code --install-extension shiplens-0.1.0.vsix --force",
+    "vscode:prepublish": "node esbuild.config.mjs --production"
+  },
+  "devDependencies": {
+    "@shiplens/core": "0.1.0",
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.32.0",
+    "esbuild": "^0.23.0"
+  }
+}

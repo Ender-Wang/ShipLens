@@ -1,0 +1,27 @@
+{
+  "name": "shiplens-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ShipLens monorepo — surface the first release version of any line of code, inline in the editor.",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "watch": "npm run watch --workspace shiplens",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "package": "npm run package --workspace shiplens",
+    "install:vsix": "npm run install:vsix --workspace shiplens"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4"
+  },
+  "//": "Dev-time only. Drop the undici override once everyone is on Node >= 20 — undici@7 (pulled in transitively by @vscode/vsce) requires it.",
+  "overrides": {
+    "undici": "^6.21.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

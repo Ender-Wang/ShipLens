@@ -1,0 +1,32 @@
+{
+  "name": "@shiplens/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Editor-agnostic core for ShipLens: git blame + tag resolution + first-release semantics.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ender-Wang/ShipLens.git",
+    "directory": "packages/core"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "watch": "tsc -p tsconfig.json --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
