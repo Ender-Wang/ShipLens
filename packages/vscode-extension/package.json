@@ -3,22 +3,28 @@
   "displayName": "ShipLens",
   "description": "See the first release version of every line of code, inline in your editor.",
   "version": "0.1.1",
-  "publisher": "ender-wang",
+  "publisher": "Ender-Wang",
   "license": "MIT",
   "icon": "icons/shiplens.png",
   "engines": {
     "vscode": "^1.85.0"
   },
   "categories": [
-    "SCM Providers",
-    "Other"
+    "SCM Providers"
   ],
   "keywords": [
     "git",
     "blame",
     "release",
     "tag",
-    "version"
+    "version",
+    "changelog",
+    "release notes",
+    "version control",
+    "shipped",
+    "first release",
+    "git tag",
+    "monorepo"
   ],
   "repository": {
     "type": "git",

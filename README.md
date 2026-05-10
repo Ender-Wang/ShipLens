@@ -148,7 +148,7 @@ npm run install:vsix   # runs `code --install-extension ... --force`
 Or install from the VSCode UI: **Extensions** panel → `…` menu → **Install
 from VSIX…** → pick `packages/vscode-extension/shiplens.vsix`.
 
-To uninstall: `code --uninstall-extension ender-wang.shiplens` (or via the
+To uninstall: `code --uninstall-extension Ender-Wang.shiplens` (or via the
 Extensions panel).
 
 ## License
