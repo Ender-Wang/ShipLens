@@ -24,7 +24,9 @@
     "shipped",
     "first release",
     "git tag",
-    "monorepo"
+    "monorepo",
+    "ship",
+    "lens"
   ],
   "repository": {
     "type": "git",
