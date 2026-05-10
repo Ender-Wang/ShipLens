@@ -19,6 +19,14 @@ The status bar quietly answers the question:
   - **Unreleased** — the commit exists but no release tag contains it.
   - **Limited history** — the repo is a shallow clone; we won't guess.
 
+## How it knows
+
+ShipLens shows a tag only when (1) `git blame` identifies the commit that owns the line, (2) `git tag --contains` finds tags that include that commit, and (3) one tag is the earliest non-pre-release among them, sorted by the **committer date of the commit each tag points to**.
+
+Steps 1 and 2 are pure git — the same machinery that powers GitLens, GitHub blame, and `git rev-list`. Step 3 is configurable via `shiplens.tagInclude` / `shiplens.tagExclude` (defaults exclude `*-rc*`, `*-beta*`, etc.).
+
+When the assumption breaks, ShipLens says so explicitly — `Uncommitted` (working-tree edit), `Unreleased` (no containing tag yet), or `Limited history` (shallow clone). It never guesses.
+
 ## Configuration
 
 | Setting | Default | Description |
@@ -40,8 +48,6 @@ large repos.
 Longer-term: Issue/PR linking via commit message references, a file-level
 release timeline view, CI/CD signal hookup, JetBrains plugin reusing the
 same core, and optional GitLens data-source integration.
-
-Track progress at <https://github.com/Ender-Wang/ShipLens>.
 
 ## License
 

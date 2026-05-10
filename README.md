@@ -37,6 +37,30 @@ the status bar.
 ShipLens is intentionally narrow. If GitLens is the microscope, ShipLens is
 the timestamp on the slide.
 
+## How it knows (and when it doesn't)
+
+ShipLens shows a tag only when three things are true:
+
+1. `git blame -L N,N -- file` reports commit `C` as the line's last author.
+2. `git tag --contains C` includes tag `T`.
+3. `T` is the earliest non-pre-release tag in that set, ordered by the **committer date of the commit each tag points to**.
+
+Steps 1 and 2 are pure git — the same machinery that powers GitLens, GitHub blame, and `git rev-list`. We don't reinterpret them. Step 3 is the only judgment call: we sort by committer date because tag *creation* date can lag the actual release (retroactive tagging), *author* date can predate the merge by months, and *topological* order isn't well-defined when commits are cherry-picked across release branches. Pre-releases are filtered before the pick via `shiplens.tagInclude` / `shiplens.tagExclude` (defaults exclude `*-rc*`, `*-beta*`, `*-alpha*`, `*-pre*`, `*-dev*`, `*-snapshot*`).
+
+When any of those assumptions doesn't hold, ShipLens says so explicitly rather than guess: `Uncommitted` (working-tree edit), `Unreleased` (no containing tag yet), `Limited history` (shallow clone, ancestry can't be traversed reliably).
+
+You can reproduce the algorithm by hand in any repo:
+
+```bash
+git blame -L N,N -- file                            # → commit SHA
+git tag --contains <sha>                            # → candidate tags
+for t in <candidates>; do                           # → committer dates
+  echo -n "$t  "; git log -1 --format='%cI' "$t"
+done | sort -k2
+```
+
+The first non-pre-release line in that sorted output is what the status bar shows. If they ever disagree, that's a bug — please [open an issue](https://github.com/Ender-Wang/ShipLens/issues).
+
 ## Use cases
 
 - **Code archaeology** — spot a critical line and immediately know which
