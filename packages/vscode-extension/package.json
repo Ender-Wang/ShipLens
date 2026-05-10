@@ -5,6 +5,7 @@
   "version": "0.1.0",
   "publisher": "ender-wang",
   "license": "MIT",
+  "icon": "icons/shiplens.png",
   "engines": {
     "vscode": "^1.85.0"
   },
