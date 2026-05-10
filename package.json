@@ -13,6 +13,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "package": "npm run package --workspace shiplens",
     "publish": "npm run publish --workspace shiplens",
+    "publish:ovsx": "npm run publish:ovsx --workspace shiplens",
+    "publish:all": "npm run publish:all --workspace shiplens",
     "install:vsix": "npm run install:vsix --workspace shiplens"
   },
   "devDependencies": {

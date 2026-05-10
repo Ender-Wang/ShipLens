@@ -86,6 +86,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "package": "vsce package --no-dependencies -o shiplens.vsix",
     "publish": "vsce publish --no-dependencies",
+    "publish:ovsx": "npm run package && ovsx publish shiplens.vsix",
+    "publish:all": "npm run package && vsce publish --packagePath shiplens.vsix --no-dependencies && ovsx publish shiplens.vsix",
     "install:vsix": "code --install-extension shiplens.vsix --force",
     "vscode:prepublish": "node esbuild.config.mjs --production"
   },
@@ -94,6 +96,7 @@
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^2.32.0",
-    "esbuild": "^0.23.0"
+    "esbuild": "^0.23.0",
+    "ovsx": "^0.10.0"
   }
 }
