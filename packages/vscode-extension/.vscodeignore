@@ -8,3 +8,8 @@ node_modules/**
 **/*.ts
 **/tsconfig*.json
 esbuild.config.mjs
+**/.DS_Store
+**/.git/**
+# Defensive — stops monorepo-relative escapes if vsce is run without --no-dependencies.
+../**
+../../**

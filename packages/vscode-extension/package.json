@@ -85,6 +85,7 @@
     "watch": "node esbuild.config.mjs --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "package": "vsce package --no-dependencies -o shiplens.vsix",
+    "publish": "vsce publish --no-dependencies",
     "install:vsix": "code --install-extension shiplens.vsix --force",
     "vscode:prepublish": "node esbuild.config.mjs --production"
   },

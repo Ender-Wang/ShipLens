@@ -12,6 +12,7 @@
     "watch": "npm run watch --workspace shiplens",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "package": "npm run package --workspace shiplens",
+    "publish": "npm run publish --workspace shiplens",
     "install:vsix": "npm run install:vsix --workspace shiplens"
   },
   "devDependencies": {
