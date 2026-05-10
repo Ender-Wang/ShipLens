@@ -1,11 +1,18 @@
+<p align="center">
+  <img src="./packages/vscode-extension/icons/shiplens.png" alt="ShipLens" width="128" />
+</p>
+
 # ShipLens
 
 > A lens from `git blame` to release version. See which release first shipped any line of code, right in your editor.
 
-[![VSCode Marketplace](https://img.shields.io/visual-studio-marketplace/v/Ender-Wang.shiplens?label=Marketplace&color=blue)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
-[![Installs](https://img.shields.io/visual-studio-marketplace/i/Ender-Wang.shiplens)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
-[![Rating](https://img.shields.io/visual-studio-marketplace/r/Ender-Wang.shiplens)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens&ssr=false#review-details)
+<div align="center">
+
+[![VS Marketplace](https://img.shields.io/github/package-json/v/Ender-Wang/ShipLens?filename=packages%2Fvscode-extension%2Fpackage.json&label=VS%20Marketplace&color=007ACC&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
+[![Open VSX](https://img.shields.io/open-vsx/v/Ender-Wang/shiplens?label=Open%20VSX&color=A60EE5)](https://open-vsx.org/extension/Ender-Wang/shiplens)
 [![License: MIT](https://img.shields.io/github/license/Ender-Wang/ShipLens)](./LICENSE)
+
+</div>
 
 ```
 🚢 v1.2.0          ← the line under your cursor first shipped in v1.2.0
@@ -20,17 +27,23 @@ question: _"in which release did this line first reach users?"_
 
 ## Install
 
-[**Install from the VSCode Marketplace →**](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
+ShipLens is published to both major marketplaces, so it's available in every common VSCode-compatible editor:
 
-Or in your editor: open the Extensions panel (`Cmd+Shift+X` / `Ctrl+Shift+X`), search **ShipLens**, click **Install**.
+| Editor | Marketplace |
+|---|---|
+| VSCode | [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) |
+| Cursor / VSCodium / Theia / Gitpod | [Open VSX Registry](https://open-vsx.org/extension/Ender-Wang/shiplens) |
 
-CLI alternative:
+Or in your editor: open the Extensions panel (`Cmd+Shift+X` / `Ctrl+Shift+X`), search **ShipLens**, click **Install**. Both marketplaces ship the same `0.1.1` build, byte-for-byte.
+
+CLI alternative (works in any VSCode-compatible editor):
 
 ```bash
-code --install-extension Ender-Wang.shiplens
+code --install-extension Ender-Wang.shiplens     # VSCode
+cursor --install-extension Ender-Wang.shiplens   # Cursor
 ```
 
-Requires VSCode `1.85+`. Works alongside GitLens.
+Requires VSCode `1.85+` (or any compatible fork). Works alongside GitLens.
 
 ## Why this exists
 
@@ -64,7 +77,7 @@ ShipLens shows a tag only when three things are true:
 2. `git tag --contains C` includes tag `T`.
 3. `T` is the earliest non-pre-release tag in that set, ordered by the **committer date of the commit each tag points to**.
 
-Steps 1 and 2 are pure git — the same machinery that powers GitLens, GitHub blame, and `git rev-list`. We don't reinterpret them. Step 3 is the only judgment call: we sort by committer date because tag *creation* date can lag the actual release (retroactive tagging), *author* date can predate the merge by months, and *topological* order isn't well-defined when commits are cherry-picked across release branches. Pre-releases are filtered before the pick via `shiplens.tagInclude` / `shiplens.tagExclude` (defaults exclude `*-rc*`, `*-beta*`, `*-alpha*`, `*-pre*`, `*-dev*`, `*-snapshot*`).
+Steps 1 and 2 are pure git — the same machinery that powers GitLens, GitHub blame, and `git rev-list`. We don't reinterpret them. Step 3 is the only judgment call: we sort by committer date because tag _creation_ date can lag the actual release (retroactive tagging), _author_ date can predate the merge by months, and _topological_ order isn't well-defined when commits are cherry-picked across release branches. Pre-releases are filtered before the pick via `shiplens.tagInclude` / `shiplens.tagExclude` (defaults exclude `*-rc*`, `*-beta*`, `*-alpha*`, `*-pre*`, `*-dev*`, `*-snapshot*`).
 
 When any of those assumptions doesn't hold, ShipLens says so explicitly rather than guess: `Uncommitted` (working-tree edit), `Unreleased` (no containing tag yet), `Limited history` (shallow clone, ancestry can't be traversed reliably).
 
@@ -97,7 +110,7 @@ The first non-pre-release line in that sorted output is what the status bar show
 
 ### v0.1 — shipped
 
-[Available on the VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) as of `0.1.1`.
+Available on the [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) and [Open VSX Registry](https://open-vsx.org/extension/Ender-Wang/shiplens) as of `0.1.1`.
 
 - [x] First-release tag for the current line, displayed in the status bar.
 - [x] Tooltip with commit SHA, summary, author, and tag date.
