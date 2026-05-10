@@ -2,6 +2,11 @@
 
 > A lens from `git blame` to release version. See which release first shipped any line of code, right in your editor.
 
+[![VSCode Marketplace](https://img.shields.io/visual-studio-marketplace/v/Ender-Wang.shiplens?label=Marketplace&color=blue)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
+[![Installs](https://img.shields.io/visual-studio-marketplace/i/Ender-Wang.shiplens)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
+[![Rating](https://img.shields.io/visual-studio-marketplace/r/Ender-Wang.shiplens)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens&ssr=false#review-details)
+[![License: MIT](https://img.shields.io/github/license/Ender-Wang/ShipLens)](./LICENSE)
+
 ```
 🚢 v1.2.0          ← the line under your cursor first shipped in v1.2.0
 🚢 Unreleased      ← committed, but not in any release tag yet
@@ -12,6 +17,20 @@
 A single status-bar item, updated as you move the cursor. No new panels, no
 hover popups, no editor decorations. Just one quiet line that answers the
 question: _"in which release did this line first reach users?"_
+
+## Install
+
+[**Install from the VSCode Marketplace →**](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
+
+Or in your editor: open the Extensions panel (`Cmd+Shift+X` / `Ctrl+Shift+X`), search **ShipLens**, click **Install**.
+
+CLI alternative:
+
+```bash
+code --install-extension Ender-Wang.shiplens
+```
+
+Requires VSCode `1.85+`. Works alongside GitLens.
 
 ## Why this exists
 
@@ -76,7 +95,9 @@ The first non-pre-release line in that sorted output is what the status bar show
 
 ## Roadmap
 
-### v0.1 — POC (current)
+### v0.1 — shipped
+
+[Available on the VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) as of `0.1.1`.
 
 - [x] First-release tag for the current line, displayed in the status bar.
 - [x] Tooltip with commit SHA, summary, author, and tag date.
