@@ -14,12 +14,6 @@ export class ShipLensStatusBar implements vscode.Disposable {
     this.item.name = 'ShipLens';
   }
 
-  showLoading(): void {
-    this.item.text = '$(loading~spin) ShipLens';
-    this.item.tooltip = 'ShipLens — resolving first release…';
-    this.item.show();
-  }
-
   showResult(result: LineReleaseResult): void {
     const { text, tooltip } = formatResult(result);
     this.item.text = text;

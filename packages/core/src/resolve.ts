@@ -18,9 +18,10 @@ export async function resolveLineRelease(req: ResolveRequest): Promise<LineRelea
   // VSCode hands us the path the user opened, which may go through a symlink
   // (notably macOS' /var → /private/var). `git rev-parse --show-toplevel`
   // returns the realpathed root, so without this normalization the relative
-  // path passed to `git blame` lands "outside repository".
+  // path passed to `git blame` lands "outside repository". The repoRoot
+  // already comes from `findRepoRoot` and is canonical; only the file needs it.
   const filePath = await safeRealpath(req.filePath);
-  const repoRoot = await safeRealpath(req.repoRoot);
+  const repoRoot = req.repoRoot;
 
   let blame;
   try {

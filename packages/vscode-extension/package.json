@@ -2,7 +2,7 @@
   "name": "shiplens",
   "displayName": "ShipLens",
   "description": "See the first release version of every line of code, inline in your editor.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "ender-wang",
   "license": "MIT",
   "icon": "icons/shiplens.png",
@@ -78,8 +78,8 @@
     "build": "node esbuild.config.mjs",
     "watch": "node esbuild.config.mjs --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "package": "vsce package --no-dependencies",
-    "install:vsix": "code --install-extension shiplens-0.1.0.vsix --force",
+    "package": "vsce package --no-dependencies -o shiplens.vsix",
+    "install:vsix": "code --install-extension shiplens.vsix --force",
     "vscode:prepublish": "node esbuild.config.mjs --production"
   },
   "devDependencies": {

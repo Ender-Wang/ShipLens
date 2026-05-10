@@ -3,6 +3,7 @@ import { resolveLineRelease, type LineReleaseResult } from '@shiplens/core';
 import { ShipLensStatusBar } from './statusBar.js';
 import { readConfig, type ShipLensConfig } from './config.js';
 import { RepoLookup } from './repoCache.js';
+import { ResultCache } from './resultCache.js';
 
 /**
  * Coordinates VSCode events with the core resolver and the status bar.
@@ -16,7 +17,9 @@ import { RepoLookup } from './repoCache.js';
 export class ShipLensController implements vscode.Disposable {
   private statusBar: ShipLensStatusBar;
   private config: ShipLensConfig;
+  private configFingerprint: string;
   private readonly repoLookup = new RepoLookup();
+  private readonly resultCache = new ResultCache();
   private readonly disposables: vscode.Disposable[] = [];
 
   private debounceTimer: NodeJS.Timeout | undefined;
@@ -26,6 +29,7 @@ export class ShipLensController implements vscode.Disposable {
 
   constructor(private readonly logger: vscode.OutputChannel) {
     this.config = readConfig();
+    this.configFingerprint = fingerprintConfig(this.config);
     this.statusBar = new ShipLensStatusBar(this.config.statusBarAlignment);
 
     this.disposables.push(
@@ -38,11 +42,13 @@ export class ShipLensController implements vscode.Disposable {
         if (!e.affectsConfiguration('shiplens')) return;
         const previousAlignment = this.config.statusBarAlignment;
         this.config = readConfig();
+        this.configFingerprint = fingerprintConfig(this.config);
         if (this.config.statusBarAlignment !== previousAlignment) {
           this.statusBar.dispose();
           this.statusBar = new ShipLensStatusBar(this.config.statusBarAlignment);
         }
-        this.lastQueryKey = undefined; // force re-evaluation under new settings
+        this.lastQueryKey = undefined;
+        this.resultCache.clear(); // settings affect picking; cached results may now be wrong.
         this.scheduleRefresh(0);
       }),
     );
@@ -84,6 +90,13 @@ export class ShipLensController implements vscode.Disposable {
     if (queryKey === this.lastQueryKey) return;
     this.lastQueryKey = queryKey;
 
+    const cacheKey = `${queryKey}::${this.configFingerprint}`;
+    const cached = this.resultCache.get(cacheKey);
+    if (cached) {
+      this.statusBar.showResult(cached);
+      return;
+    }
+
     const repoRoot = await this.repoLookup.forFile(filePath);
     if (!repoRoot) {
       this.statusBar.hide();
@@ -91,7 +104,11 @@ export class ShipLensController implements vscode.Disposable {
     }
 
     const requestId = ++this.currentRequestId;
-    this.statusBar.showLoading();
+
+    // Stale-while-revalidate: keep the previous status-bar text on screen
+    // while the new query runs. Showing a loading state here would cause two
+    // width-changes per cursor move (loading → result), which other status
+    // bar items pick up as a visible reflow / "glitch".
 
     let result: LineReleaseResult;
     try {
@@ -113,6 +130,7 @@ export class ShipLensController implements vscode.Disposable {
     }
 
     if (requestId !== this.currentRequestId) return; // stale
+    this.resultCache.set(cacheKey, result);
     this.statusBar.showResult(result);
   }
 
@@ -120,5 +138,17 @@ export class ShipLensController implements vscode.Disposable {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     for (const d of this.disposables) d.dispose();
     this.statusBar.dispose();
+    this.resultCache.clear();
   }
+}
+
+function fingerprintConfig(config: ShipLensConfig): string {
+  // Only the fields that affect the resolved result need to be in the key —
+  // statusBar.alignment and debounceMs do not.
+  return [
+    config.tagInclude,
+    config.tagExclude.join(','),
+    config.sortBy,
+    config.followRenames ? '1' : '0',
+  ].join('|');
 }

@@ -117,12 +117,12 @@ iterate; reload the host window (`Cmd+R`) after a change.
 ### Build a `.vsix` and install manually
 
 ```bash
-npm run package        # produces packages/vscode-extension/shiplens-<version>.vsix
+npm run package        # produces packages/vscode-extension/shiplens.vsix
 npm run install:vsix   # runs `code --install-extension ... --force`
 ```
 
 Or install from the VSCode UI: **Extensions** panel → `…` menu → **Install
-from VSIX…** → pick `packages/vscode-extension/shiplens-0.1.0.vsix`.
+from VSIX…** → pick `packages/vscode-extension/shiplens.vsix`.
 
 To uninstall: `code --uninstall-extension ender-wang.shiplens` (or via the
 Extensions panel).
