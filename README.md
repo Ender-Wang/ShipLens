@@ -34,7 +34,7 @@ ShipLens is published to both major marketplaces, so it's available in every com
 | VSCode | [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) |
 | Cursor / VSCodium / Theia / Gitpod | [Open VSX Registry](https://open-vsx.org/extension/Ender-Wang/shiplens) |
 
-Or in your editor: open the Extensions panel (`Cmd+Shift+X` / `Ctrl+Shift+X`), search **ShipLens**, click **Install**. Both marketplaces ship the same `0.1.1` build, byte-for-byte.
+Or in your editor: open the Extensions panel (`Cmd+Shift+X` / `Ctrl+Shift+X`), search **ShipLens**, click **Install**. Both marketplaces ship the same build, byte-for-byte.
 
 CLI alternative (works in any VSCode-compatible editor):
 
@@ -110,7 +110,7 @@ The first non-pre-release line in that sorted output is what the status bar show
 
 ### v0.1 — shipped
 
-Available on the [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) and [Open VSX Registry](https://open-vsx.org/extension/Ender-Wang/shiplens) as of `0.1.1`.
+Available on the [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) and [Open VSX Registry](https://open-vsx.org/extension/Ender-Wang/shiplens).
 
 - [x] First-release tag for the current line, displayed in the status bar.
 - [x] Tooltip with commit SHA, summary, author, and tag date.
@@ -140,7 +140,7 @@ The defaults work for most repos. The full set of v0.1 settings:
 | Setting | Default | Description |
 |---|---|---|
 | `shiplens.tagInclude` | `*` | Glob passed to `git tag --contains`. |
-| `shiplens.tagExclude` | `["*-rc*", "*-beta*", "*-alpha*", "*-pre*", "*-dev*", "*-snapshot*"]` | Patterns dropped after the include filter. |
+| `shiplens.tagExclude` | `["*-rc*", "*-beta*", "*-alpha*", "*-pre*", "*-dev*", "*-snapshot*", "rescue/*"]` | Patterns dropped after the include filter. Covers common pre-release suffixes and the `rescue/*` namespace some teams use for internal hotfixes. |
 | `shiplens.sortBy` | `committerDate` | How candidate tags are ordered. |
 | `shiplens.debounceMs` | `150` | Delay between cursor movement and the next query. |
 | `shiplens.followRenames` | `false` | Pass `--follow` to `git blame`. |

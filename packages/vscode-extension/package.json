@@ -2,7 +2,7 @@
   "name": "shiplens",
   "displayName": "ShipLens",
   "description": "See the first release version of every line of code, inline in your editor.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "Ender-Wang",
   "license": "MIT",
   "icon": "icons/shiplens.png",
@@ -52,8 +52,8 @@
         "shiplens.tagExclude": {
           "type": "array",
           "items": { "type": "string" },
-          "default": ["*-rc*", "*-beta*", "*-alpha*", "*-pre*", "*-dev*", "*-snapshot*"],
-          "description": "Glob patterns for tags to ignore when picking the first release (typically pre-releases)."
+          "default": ["*-rc*", "*-beta*", "*-alpha*", "*-pre*", "*-dev*", "*-snapshot*", "rescue/*"],
+          "description": "Glob patterns for tags to ignore when picking the first release. Defaults cover common pre-release suffixes plus the `rescue/*` namespace some teams use for internal hotfix releases."
         },
         "shiplens.sortBy": {
           "type": "string",

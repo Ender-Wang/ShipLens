@@ -32,7 +32,7 @@ When the assumption breaks, ShipLens says so explicitly — `Uncommitted` (worki
 | Setting | Default | Description |
 |---|---|---|
 | `shiplens.tagInclude` | `*` | Glob passed to `git tag --contains`. |
-| `shiplens.tagExclude` | `["*-rc*", "*-beta*", "*-alpha*", "*-pre*", "*-dev*", "*-snapshot*"]` | Patterns dropped after the include filter. |
+| `shiplens.tagExclude` | `["*-rc*", "*-beta*", "*-alpha*", "*-pre*", "*-dev*", "*-snapshot*", "rescue/*"]` | Patterns dropped after the include filter. |
 | `shiplens.sortBy` | `committerDate` | How candidate tags are ordered. v0.1 only implements `committerDate`. |
 | `shiplens.debounceMs` | `150` | Delay between cursor movement and the next query. |
 | `shiplens.followRenames` | `false` | Pass `--follow` to `git blame`. |
