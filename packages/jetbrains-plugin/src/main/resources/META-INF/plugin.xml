@@ -1,0 +1,59 @@
+<idea-plugin>
+  <id>com.shiplens.jetbrains</id>
+  <name>ShipLens</name>
+  <vendor email="4a9ebb44@gmail.com" url="https://github.com/Ender-Wang/ShipLens">Ender Wang</vendor>
+
+  <description><![CDATA[
+    <p>A lens from <code>git blame</code> to release version. See which release first shipped any line of code, right in your IDE.</p>
+    <p>The status bar shows the first release tag that contains the line under your cursor — answering the question "in which release did this line first reach users?" without leaving the editor.</p>
+    <ul>
+      <li>Single status-bar item, updates as the cursor moves.</li>
+      <li>Tooltip with commit SHA, summary, author, and tag date.</li>
+      <li>Configurable tag include/exclude globs (pre-releases filtered by default).</li>
+      <li>Graceful degradation for <code>Uncommitted</code>, <code>Unreleased</code>, and <code>Limited history</code>.</li>
+    </ul>
+    <p>Same algorithm as the <a href="https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens">VSCode/Cursor edition</a>.</p>
+  ]]></description>
+
+  <change-notes><![CDATA[
+    <h3>0.1.2 — initial JetBrains release</h3>
+    <p>First release on the JetBrains Marketplace, with feature parity to the VSCode/Cursor edition at version 0.1.2. Both editions will advance together going forward.</p>
+    <ul>
+      <li>Status-bar widget showing the first release tag for the line under the cursor.</li>
+      <li>Tooltip with commit SHA, summary, author, and tag date.</li>
+      <li>Tag include/exclude glob configuration. Defaults exclude common pre-release patterns plus the <code>rescue/*</code> namespace some teams use for internal hotfixes.</li>
+      <li>Graceful degradation for <code>Uncommitted</code>, <code>Unreleased</code>, and <code>Limited history</code> states.</li>
+      <li>Settings UI under <b>Settings → Tools → ShipLens</b>.</li>
+      <li>Plugin icon mirroring the VSCode edition.</li>
+    </ul>
+  ]]></change-notes>
+
+  <!-- Compatible with all IntelliJ Platform IDEs (IDEA, PyCharm, GoLand, WebStorm, RubyMine, Android Studio, …). -->
+  <depends>com.intellij.modules.platform</depends>
+  <depends>Git4Idea</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+    <!-- Status bar widget — appears in the bottom-right by default. -->
+    <statusBarWidgetFactory
+      id="ShipLensStatusBarWidget"
+      implementation="com.shiplens.jetbrains.statusbar.ShipLensStatusBarWidgetFactory"
+      order="last" />
+
+    <!-- Application-level settings (persisted to ~/.config/JetBrains/.../shiplens.xml). -->
+    <applicationService
+      serviceImplementation="com.shiplens.jetbrains.settings.ShipLensSettings" />
+
+    <!-- Settings UI under Preferences → Tools → ShipLens. -->
+    <applicationConfigurable
+      parentId="tools"
+      instance="com.shiplens.jetbrains.settings.ShipLensConfigurable"
+      id="com.shiplens.jetbrains.settings.ShipLensConfigurable"
+      displayName="ShipLens" />
+  </extensions>
+
+  <projectListeners>
+    <listener
+      class="com.shiplens.jetbrains.editor.ShipLensFileEditorListener"
+      topic="com.intellij.openapi.fileEditor.FileEditorManagerListener" />
+  </projectListeners>
+</idea-plugin>

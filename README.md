@@ -173,9 +173,10 @@ This is an npm-workspaces monorepo:
   does the git work. Pure TypeScript, no editor dependencies.
 - **`packages/vscode-extension`** — `shiplens`, the VSCode extension shell.
   UI, configuration, and event wiring; no git logic of its own.
-
-The split keeps the door open for a future JetBrains plugin to reuse the
-same core.
+- **`packages/jetbrains-plugin`** — `shiplens-jetbrains`, a Kotlin port of the
+  algorithm + IntelliJ-Platform integration (status bar, settings,
+  listeners). Single-JAR, no Node runtime, no IPC. Mirrors `@shiplens/core`'s
+  structure file-for-file for easy lockstep maintenance.
 
 ## Development
 

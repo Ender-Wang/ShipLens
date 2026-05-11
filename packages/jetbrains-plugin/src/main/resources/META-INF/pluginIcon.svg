@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <!-- Hull body -->
+  <path d="M 5 24 L 33 24 L 31 30 C 31 30 30 31 28 31 L 9 31 C 7 31 6 30 6 30 Z" fill="#C62828"/>
+  <!-- Hull waterline band -->
+  <path d="M 5 24 L 33 24 L 33 25.4 L 5 25.4 Z" fill="#7B1F1F"/>
+
+  <!-- Lower cabin (white deck with portholes) -->
+  <rect x="7" y="19" width="24" height="5" fill="#F5F5F5" stroke="#5D4037" stroke-width="0.4"/>
+  <circle cx="10" cy="21.5" r="0.7" fill="#1565C0"/>
+  <circle cx="13" cy="21.5" r="0.7" fill="#1565C0"/>
+  <circle cx="16" cy="21.5" r="0.7" fill="#1565C0"/>
+  <circle cx="19" cy="21.5" r="0.7" fill="#1565C0"/>
+
+  <!-- Upper cabin -->
+  <rect x="12" y="14" width="14" height="5" fill="#F5F5F5" stroke="#5D4037" stroke-width="0.4"/>
+
+  <!-- Two smokestacks with black caps -->
+  <rect x="14" y="7" width="3" height="7" fill="#C62828"/>
+  <rect x="14" y="7" width="3" height="1.6" fill="#212121"/>
+  <rect x="20" y="7" width="3" height="7" fill="#C62828"/>
+  <rect x="20" y="7" width="3" height="1.6" fill="#212121"/>
+
+  <!-- Magnifying glass: glass tint -->
+  <circle cx="29" cy="28" r="4.5" fill="#FFFFFF" fill-opacity="0.28"/>
+  <!-- Magnifying glass: ring -->
+  <circle cx="29" cy="28" r="5" fill="none" stroke="#B89150" stroke-width="1.6"/>
+  <!-- Magnifying glass: handle -->
+  <line x1="32.5" y1="31.5" x2="36" y2="35" stroke="#B89150" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

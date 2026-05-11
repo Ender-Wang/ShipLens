@@ -1,0 +1,11 @@
+.gradle/
+.idea/
+build/
+out/
+*.iml
+local.properties
+
+# IntelliJ Platform Gradle plugin scratch space —
+# downloaded platform artifacts, the runIde sandbox, layout indexes.
+# All transient; none should be committed.
+.intellijPlatform/
