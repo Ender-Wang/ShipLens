@@ -106,6 +106,25 @@ The first non-pre-release line in that sorted output is what the status bar show
 - **Multi-repo workflows** — in microservice or multi-repo setups, quickly
   correlate a change in the current repo with its release graph.
 
+## Use it from the CLI / agent
+
+For agent / CLI workflows (Cursor CLI, Claude Code CLI, GitHub Copilot CLI, etc.) where the editor isn't open, ShipLens ships a [Cursor Agent Skill](https://docs.cursor.com/) that teaches your agent the same algorithm. Install it once:
+
+```bash
+mkdir -p ~/.cursor/skills
+cp -r skills/shiplens ~/.cursor/skills/
+```
+
+Then ask your agent things like:
+
+- _"Which release first shipped line 42 of `src/auth.ts`?"_
+- _"In which version did the regression on line 88 of this file land?"_
+- _"What tag contains commit abc1234?"_
+
+The skill auto-activates on those phrasings — no need to mention "ShipLens" by name. It runs the exact same `git blame → git tag --contains → first by committer date` pipeline as the editor extension, with the same default filters.
+
+The canonical skill source lives at [`skills/shiplens/SKILL.md`](./skills/shiplens/SKILL.md) in this repo. It's updated alongside extension releases when defaults change.
+
 ## Roadmap
 
 ### v0.1 — shipped

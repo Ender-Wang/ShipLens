@@ -38,6 +38,10 @@ When the assumption breaks, ShipLens says so explicitly — `Uncommitted` (worki
 | `shiplens.followRenames` | `false` | Pass `--follow` to `git blame`. |
 | `shiplens.statusBar.alignment` | `right` | Status bar position. |
 
+## Use it from the CLI / agent
+
+ShipLens also distributes a [Cursor Agent Skill](https://github.com/Ender-Wang/ShipLens/tree/main/skills/shiplens) that gives CLI agents (Cursor CLI, Claude Code, GitHub Copilot CLI) the same first-release lookup logic as this extension. Useful when you're not in the editor but still want to ask "which release first shipped line N of file F?". Install via `cp -r skills/shiplens ~/.cursor/skills/` from a clone of the [ShipLens repo](https://github.com/Ender-Wang/ShipLens).
+
 ## Roadmap
 
 Near-term (v0.2): click status-bar to open the tag page on GitHub/GitLab,
