@@ -1,0 +1,16 @@
+# build artifacts
+/bin/
+/dist/
+# top-level binaries from `go build` without -o bin/
+# (anchored so it doesn't swallow cmd/shiplens/)
+/shiplens
+/shiplens.exe
+
+# test coverage
+*.out
+coverage.txt
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
