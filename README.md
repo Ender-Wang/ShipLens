@@ -11,6 +11,7 @@
 [![VS Marketplace](https://img.shields.io/github/package-json/v/Ender-Wang/ShipLens?filename=packages%2Fvscode-extension%2Fpackage.json&label=VS%20Marketplace&color=007ACC&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
 [![Open VSX](https://img.shields.io/open-vsx/v/Ender-Wang/shiplens?label=Open%20VSX&color=A60EE5)](https://open-vsx.org/extension/Ender-Wang/shiplens)
 [![JetBrains](https://img.shields.io/jetbrains/plugin/v/31705?label=JetBrains&color=FE2857)](https://plugins.jetbrains.com/plugin/31705-shiplens)
+[![Homebrew](https://img.shields.io/github/v/release/Ender-Wang/ShipLens?label=Homebrew&color=FBB040&logo=homebrew&logoColor=white)](https://github.com/Ender-Wang/homebrew-tap)
 [![License: MIT](https://img.shields.io/github/license/Ender-Wang/ShipLens)](./LICENSE)
 
 </div>
@@ -28,26 +29,36 @@ question: _"in which release did this line first reach users?"_
 
 ## Install
 
-ShipLens is published to both major marketplaces, so it's available in every common VSCode-compatible editor:
+ShipLens runs in three places: VSCode-compatible editors, JetBrains-Platform IDEs, and your terminal.
 
-| Editor | Marketplace |
+| Surface | Where to get it |
 |---|---|
 | VSCode | [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) |
 | Cursor / VSCodium / Theia / Gitpod | [Open VSX Registry](https://open-vsx.org/extension/Ender-Wang/shiplens) |
-| Any IntelliJ-Platform IDE (2025.1+) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31705-shiplens) |
+| Any JetBrains-Platform IDE (2025.1+) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31705-shiplens) |
+| Terminal (macOS / Linux) | [`brew install ender-wang/tap/shiplens`](https://github.com/Ender-Wang/homebrew-tap) |
+| Terminal (any OS, manual) | [GitHub Releases](https://github.com/Ender-Wang/ShipLens/releases) — `shiplens-cli-*.tar.gz` / `.zip` |
 
 **JetBrains IDE coverage** — verified compatible: IntelliJ IDEA (Ultimate + Community), PyCharm (Pro + Community), GoLand, WebStorm, RubyMine, CLion, Rider, DataGrip, PhpStorm, RustRover, DataSpell, Android Studio, MPS. Not supported: AppCode (deprecated upstream), JetBrains Gateway, JetBrains Client, Code With Me Guest.
 
-Or in your editor: open the Extensions panel (`Cmd+Shift+X` / `Ctrl+Shift+X`), search **ShipLens**, click **Install**. Both marketplaces ship the same build, byte-for-byte.
+In an editor, open the Extensions panel (`Cmd+Shift+X` / `Ctrl+Shift+X`), search **ShipLens**, click **Install**. All editor builds ship the same algorithm, byte-for-byte.
 
-CLI alternative (works in any VSCode-compatible editor):
+To install an editor extension from the command line:
 
 ```bash
 code --install-extension Ender-Wang.shiplens     # VSCode
 cursor --install-extension Ender-Wang.shiplens   # Cursor
 ```
 
-Requires VSCode `1.85+` (or any compatible fork). Works alongside GitLens.
+To install the CLI:
+
+```bash
+brew install ender-wang/tap/shiplens             # macOS / Linux (Homebrew)
+shiplens line src/auth.ts:42                     # → 🚢 v1.2.0
+shiplens commit abc1234 --json                   # stable JSON for scripts / CI
+```
+
+Requires VSCode `1.85+` (or any compatible fork) for the editor extension; the CLI has no runtime dependencies beyond `git` on `PATH`. Works alongside GitLens.
 
 ## Why this exists
 
@@ -110,9 +121,9 @@ The first non-pre-release line in that sorted output is what the status bar show
 - **Multi-repo workflows** — in microservice or multi-repo setups, quickly
   correlate a change in the current repo with its release graph.
 
-## Use it from the CLI / agent
+## Use it from an agent
 
-For agent / CLI workflows (Cursor CLI, Claude Code CLI, GitHub Copilot CLI, etc.) where the editor isn't open, ShipLens ships a [Cursor Agent Skill](https://docs.cursor.com/) that teaches your agent the same algorithm. Install it once:
+The `shiplens` CLI (see [Install](#install)) covers scripts, CI jobs, and any agent that can shell out. For Cursor specifically, ShipLens also ships a [Cursor Agent Skill](https://docs.cursor.com/) that teaches the agent the same algorithm without needing the binary on `PATH`. Install it once:
 
 ```bash
 mkdir -p ~/.cursor/skills
