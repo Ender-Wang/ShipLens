@@ -4,7 +4,7 @@ JetBrains Platform plugin for ShipLens. Same algorithm and feature set as the [V
 
 ## What it does
 
-When you move the cursor inside a tracked file in any IntelliJ-Platform IDE (IDEA, PyCharm, GoLand, WebStorm, RubyMine, Android Studio, …), the status bar shows the **first release tag that contains the line under your cursor**:
+When you move the cursor inside a tracked file in any IntelliJ-Platform IDE (IDEA, PyCharm, GoLand, WebStorm, RubyMine, CLion, Rider, DataGrip, PhpStorm, RustRover, DataSpell, Android Studio, MPS), the status bar shows the **first release tag that contains the line under your cursor**:
 
 ```
 🚢 v1.2.0          ← the line first shipped in v1.2.0

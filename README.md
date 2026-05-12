@@ -10,6 +10,7 @@
 
 [![VS Marketplace](https://img.shields.io/github/package-json/v/Ender-Wang/ShipLens?filename=packages%2Fvscode-extension%2Fpackage.json&label=VS%20Marketplace&color=007ACC&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
 [![Open VSX](https://img.shields.io/open-vsx/v/Ender-Wang/shiplens?label=Open%20VSX&color=A60EE5)](https://open-vsx.org/extension/Ender-Wang/shiplens)
+[![JetBrains](https://img.shields.io/jetbrains/plugin/v/31705?label=JetBrains&color=FE2857)](https://plugins.jetbrains.com/plugin/31705-shiplens)
 [![License: MIT](https://img.shields.io/github/license/Ender-Wang/ShipLens)](./LICENSE)
 
 </div>
@@ -33,6 +34,9 @@ ShipLens is published to both major marketplaces, so it's available in every com
 |---|---|
 | VSCode | [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) |
 | Cursor / VSCodium / Theia / Gitpod | [Open VSX Registry](https://open-vsx.org/extension/Ender-Wang/shiplens) |
+| Any IntelliJ-Platform IDE (2025.1+) | [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31705-shiplens) |
+
+**JetBrains IDE coverage** — verified compatible: IntelliJ IDEA (Ultimate + Community), PyCharm (Pro + Community), GoLand, WebStorm, RubyMine, CLion, Rider, DataGrip, PhpStorm, RustRover, DataSpell, Android Studio, MPS. Not supported: AppCode (deprecated upstream), JetBrains Gateway, JetBrains Client, Code With Me Guest.
 
 Or in your editor: open the Extensions panel (`Cmd+Shift+X` / `Ctrl+Shift+X`), search **ShipLens**, click **Install**. Both marketplaces ship the same build, byte-for-byte.
 
@@ -129,7 +133,7 @@ The canonical skill source lives at [`skills/shiplens/SKILL.md`](./skills/shiple
 
 ### v0.1 — shipped
 
-Available on the [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens) and [Open VSX Registry](https://open-vsx.org/extension/Ender-Wang/shiplens).
+Available on the [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens), [Open VSX Registry](https://open-vsx.org/extension/Ender-Wang/shiplens), and [JetBrains Marketplace](https://plugins.jetbrains.com/plugin/31705-shiplens).
 
 - [x] First-release tag for the current line, displayed in the status bar.
 - [x] Tooltip with commit SHA, summary, author, and tag date.
