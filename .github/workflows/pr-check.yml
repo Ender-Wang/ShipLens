@@ -1,0 +1,114 @@
+name: PR Check
+
+# Runs on every PR targeting main. Triggers are repo-wide; per-edition jobs
+# are gated by paths-filter so we only spend CI minutes on what changed.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      cli: ${{ steps.filter.outputs.cli }}
+      vscode: ${{ steps.filter.outputs.vscode }}
+      jetbrains: ${{ steps.filter.outputs.jetbrains }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            cli:
+              - 'packages/cli/**'
+              - '.github/workflows/pr-check.yml'
+            vscode:
+              - 'packages/core/**'
+              - 'packages/vscode-extension/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig*.json'
+              - '.github/workflows/pr-check.yml'
+            jetbrains:
+              - 'packages/jetbrains-plugin/**'
+              - '.github/workflows/pr-check.yml'
+
+  cli:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.cli == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: gofmt (must be clean)
+        run: |
+          set -euo pipefail
+          cd packages/cli
+          DIFF=$(gofmt -l .)
+          if [ -n "$DIFF" ]; then
+            echo "::error::These files need gofmt:"
+            echo "$DIFF"
+            echo "---"
+            gofmt -d .
+            exit 1
+          fi
+
+      - name: go vet
+        run: cd packages/cli && go vet ./...
+
+      - name: go build
+        run: cd packages/cli && go build -trimpath ./cmd/shiplens
+
+  vscode:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.vscode == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck core + extension
+        run: npm run typecheck
+
+      - name: Build core
+        run: npm run build --workspace @shiplens/core
+
+      - name: Package extension (smoke test)
+        run: npm run package --workspace shiplens
+
+  jetbrains:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.jetbrains == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build plugin
+        run: |
+          set -euo pipefail
+          cd packages/jetbrains-plugin
+          # Override the locally-pinned IDE path so CI downloads the platform.
+          ./gradlew buildPlugin -PlocalIdePath= --no-daemon --stacktrace

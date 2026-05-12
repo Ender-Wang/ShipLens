@@ -1,0 +1,375 @@
+name: Release
+
+# Builds and releases ShipLens artifacts to GitHub Releases, then updates the
+# Homebrew tap. Designed to be the *offline* distribution path — VSCode and
+# JetBrains marketplace publishes still happen out-of-band (manually via
+# `vsce publish` / Gradle `publishPlugin`). Users who can't reach those
+# marketplaces can grab the .vsix / plugin .zip / `shiplens` binary here.
+#
+# Triggers:
+#   workflow_dispatch  — manual run; optional `tag` input. Default reads CLI
+#                        version from packages/cli/cmd/shiplens/main.go and
+#                        produces tag `v<version>` (lockstep release).
+#   push of tag v*     — lockstep release (CLI + VSCode + JetBrains).
+#   push of tag cli-v* — CLI-only release (skips VSCode + JetBrains jobs).
+#
+# Idempotency: softprops/action-gh-release upserts at `tag_name`. Re-running
+# at an existing tag updates the release assets in place.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release at (e.g. v0.1.2 or cli-v0.1.3). Empty = read CLI version from main.go and use v<version>.'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'v*'
+      - 'cli-v*'
+
+permissions:
+  contents: write   # softprops/action-gh-release needs this to create releases
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.compute.outputs.tag }}
+      version: ${{ steps.compute.outputs.version }}
+      build_cli: ${{ steps.compute.outputs.build_cli }}
+      build_vscode: ${{ steps.compute.outputs.build_vscode }}
+      build_jetbrains: ${{ steps.compute.outputs.build_jetbrains }}
+      release_notes: ${{ steps.compute.outputs.release_notes }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - id: compute
+        run: |
+          set -euo pipefail
+
+          # Resolve tag.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            INPUT_TAG="${{ inputs.tag }}"
+            if [ -n "$INPUT_TAG" ]; then
+              TAG="$INPUT_TAG"
+            else
+              CLI_VERSION=$(grep '^var Version' packages/cli/cmd/shiplens/main.go \
+                | sed 's/.*"\([^"]*\)".*/\1/')
+              TAG="v$CLI_VERSION"
+            fi
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+
+          # Strip prefix to get plain version (used by Formula, gradle, etc).
+          VERSION="$TAG"
+          VERSION="${VERSION#cli-}"
+          VERSION="${VERSION#v}"
+
+          # Decide which editions to build based on tag prefix.
+          case "$TAG" in
+            cli-v*)
+              BUILD_CLI=true
+              BUILD_VSCODE=false
+              BUILD_JETBRAINS=false
+              ;;
+            v*)
+              BUILD_CLI=true
+              BUILD_VSCODE=true
+              BUILD_JETBRAINS=true
+              ;;
+            *)
+              echo "Unrecognised tag format: $TAG" >&2
+              exit 1
+              ;;
+          esac
+
+          # Release notes: HEAD commit body (skip first two lines = subject + blank).
+          # Mirrors EdgeMark's pattern.
+          NOTES=$(git log -1 --pretty=%B | tail -n +3 || true)
+          if [ -z "$NOTES" ]; then
+            NOTES="Release $TAG"
+          fi
+
+          {
+            echo "tag=$TAG"
+            echo "version=$VERSION"
+            echo "build_cli=$BUILD_CLI"
+            echo "build_vscode=$BUILD_VSCODE"
+            echo "build_jetbrains=$BUILD_JETBRAINS"
+            echo "release_notes<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Resolved: tag=$TAG version=$VERSION cli=$BUILD_CLI vscode=$BUILD_VSCODE jb=$BUILD_JETBRAINS"
+
+  build-cli:
+    needs: prepare
+    if: needs.prepare.outputs.build_cli == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: darwin,  goarch: arm64, ext: tar.gz }
+          - { goos: darwin,  goarch: amd64, ext: tar.gz }
+          - { goos: linux,   goarch: arm64, ext: tar.gz }
+          - { goos: linux,   goarch: amd64, ext: tar.gz }
+          - { goos: windows, goarch: amd64, ext: zip    }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+
+      - name: Cross-compile
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: '0'
+        run: |
+          set -euo pipefail
+          cd packages/cli
+          VERSION="${{ needs.prepare.outputs.version }}"
+          TAG="${{ needs.prepare.outputs.tag }}"
+
+          BIN="shiplens"
+          if [ "${{ matrix.goos }}" = "windows" ]; then
+            BIN="shiplens.exe"
+          fi
+
+          mkdir -p out
+          # -trimpath: reproducible builds. -s -w: smaller binary (strip debug).
+          go build \
+            -trimpath \
+            -ldflags "-s -w -X main.Version=$VERSION" \
+            -o "out/$BIN" \
+            ./cmd/shiplens
+
+          ARCHIVE="shiplens-cli-${TAG}-${{ matrix.goos }}-${{ matrix.goarch }}.${{ matrix.ext }}"
+
+          if [ "${{ matrix.ext }}" = "zip" ]; then
+            (cd out && zip -j "../$ARCHIVE" "$BIN")
+          else
+            tar -czf "$ARCHIVE" -C out "$BIN"
+          fi
+
+          # `<sha>  <filename>` form, matches EdgeMark and `shasum -c` convention.
+          shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
+
+          ls -lh "$ARCHIVE" "$ARCHIVE.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: |
+            packages/cli/shiplens-cli-*.tar.gz
+            packages/cli/shiplens-cli-*.zip
+            packages/cli/shiplens-cli-*.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  build-vscode:
+    needs: prepare
+    if: needs.prepare.outputs.build_vscode == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build core
+        run: npm run build --workspace @shiplens/core
+
+      - name: Package extension
+        run: npm run package --workspace shiplens
+
+      - name: Rename to embed tag
+        run: |
+          set -euo pipefail
+          cd packages/vscode-extension
+          mv shiplens.vsix "shiplens-${{ needs.prepare.outputs.tag }}.vsix"
+          ls -lh shiplens-*.vsix
+          shasum -a 256 "shiplens-${{ needs.prepare.outputs.tag }}.vsix" \
+            > "shiplens-${{ needs.prepare.outputs.tag }}.vsix.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vscode-extension
+          path: |
+            packages/vscode-extension/shiplens-*.vsix
+            packages/vscode-extension/shiplens-*.vsix.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  build-jetbrains:
+    needs: prepare
+    if: needs.prepare.outputs.build_jetbrains == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build plugin
+        run: |
+          set -euo pipefail
+          cd packages/jetbrains-plugin
+
+          # Override localIdePath (committed value points at /Applications which
+          # doesn't exist on the runner). Empty value → conditional in
+          # build.gradle.kts falls through to create() and downloads the
+          # IntelliJ Platform from JetBrains.
+          ./gradlew buildPlugin -PlocalIdePath= --no-daemon --stacktrace
+
+          cd build/distributions
+          # Plugin name is "ShipLens" (configurable in gradle.properties).
+          # Use a glob to be tolerant of casing and version naming.
+          ZIP=$(ls -1 *.zip | head -1)
+          DEST="shiplens-jetbrains-${{ needs.prepare.outputs.tag }}.zip"
+          mv "$ZIP" "$DEST"
+          shasum -a 256 "$DEST" > "$DEST.sha256"
+          ls -lh "$DEST" "$DEST.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jetbrains-plugin
+          path: |
+            packages/jetbrains-plugin/build/distributions/shiplens-jetbrains-*.zip
+            packages/jetbrains-plugin/build/distributions/shiplens-jetbrains-*.zip.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [prepare, build-cli, build-vscode, build-jetbrains]
+    # Run after the build jobs that *should* have run finished without failing.
+    # Skipped jobs (e.g. vscode/jb on a cli-only tag) don't trigger failure().
+    if: always() && !cancelled() && !failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List collected assets
+        run: ls -lh artifacts/
+
+      - uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.tag }}
+          body: ${{ needs.prepare.outputs.release_notes }}
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-tap:
+    needs: [prepare, release]
+    # Update the Homebrew tap whenever a CLI build was produced.
+    if: needs.prepare.outputs.build_cli == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for release assets to settle
+        run: sleep 10
+
+      - name: Fetch SHA256 sidecars
+        id: sha
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          for PLATFORM in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
+            gh release download "$TAG" \
+              --pattern "shiplens-cli-${TAG}-${PLATFORM}.tar.gz.sha256" \
+              --repo "${{ github.repository }}"
+          done
+          {
+            echo "darwin_arm64=$(awk '{print $1}' shiplens-cli-${TAG}-darwin-arm64.tar.gz.sha256)"
+            echo "darwin_amd64=$(awk '{print $1}' shiplens-cli-${TAG}-darwin-amd64.tar.gz.sha256)"
+            echo "linux_arm64=$(awk  '{print $1}' shiplens-cli-${TAG}-linux-arm64.tar.gz.sha256)"
+            echo "linux_amd64=$(awk  '{print $1}' shiplens-cli-${TAG}-linux-amd64.tar.gz.sha256)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate Formula and push to homebrew-tap
+        env:
+          TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
+          TAG: ${{ needs.prepare.outputs.tag }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/Ender-Wang/homebrew-tap.git" tap
+          cd tap
+
+          mkdir -p Formula
+          cat > Formula/shiplens.rb <<RUBY
+          # This file is auto-generated by ShipLens release CI.
+          # Do not edit by hand — see .github/workflows/release.yml in
+          # https://github.com/Ender-Wang/ShipLens.
+          class Shiplens < Formula
+            desc "First release version of every line of code, inline in your terminal"
+            homepage "https://github.com/Ender-Wang/ShipLens"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.arm?
+                url "https://github.com/Ender-Wang/ShipLens/releases/download/${TAG}/shiplens-cli-${TAG}-darwin-arm64.tar.gz"
+                sha256 "${{ steps.sha.outputs.darwin_arm64 }}"
+              else
+                url "https://github.com/Ender-Wang/ShipLens/releases/download/${TAG}/shiplens-cli-${TAG}-darwin-amd64.tar.gz"
+                sha256 "${{ steps.sha.outputs.darwin_amd64 }}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.arm?
+                url "https://github.com/Ender-Wang/ShipLens/releases/download/${TAG}/shiplens-cli-${TAG}-linux-arm64.tar.gz"
+                sha256 "${{ steps.sha.outputs.linux_arm64 }}"
+              else
+                url "https://github.com/Ender-Wang/ShipLens/releases/download/${TAG}/shiplens-cli-${TAG}-linux-amd64.tar.gz"
+                sha256 "${{ steps.sha.outputs.linux_amd64 }}"
+              end
+            end
+
+            def install
+              bin.install "shiplens"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/shiplens version")
+            end
+          end
+          RUBY
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/shiplens.rb
+
+          if git diff --cached --quiet; then
+            echo "Formula already up to date for $TAG, nothing to commit."
+            exit 0
+          fi
+
+          git commit -m "Update ShipLens to ${TAG}"
+          git push
