@@ -17,7 +17,7 @@ Hover the widget for commit SHA, summary, author, tag date.
 
 ## Build & run
 
-Requires **JDK 21** and (for `runIde`) any IntelliJ-Platform IDE installed locally. By default the build points at `/Applications/IntelliJ IDEA.app/Contents` (override via `localIdePath` in `gradle.properties`).
+Requires **JDK 21**. A fresh clone builds out of the box — the IntelliJ Platform is downloaded from JetBrains the first time and cached.
 
 ```bash
 cd packages/jetbrains-plugin
@@ -32,6 +32,22 @@ cd packages/jetbrains-plugin
 `runIde` opens a fresh IDE instance with ShipLens enabled. Open any folder that's a git repo with tags, then move the cursor. The status bar item appears in the bottom-right.
 
 To install the built `.zip` into your real IDE: **Settings → Plugins → ⚙️ → Install Plugin from Disk…**.
+
+### Speeding up local builds (optional)
+
+If you have an IntelliJ-Platform IDE installed locally, you can point Gradle at it and skip the ~1 GB platform download. It's a per-machine setting, so it doesn't live in the committed `gradle.properties` — set it via either of these:
+
+```bash
+# Option A — user-level (sticky across all your projects)
+echo 'localIdePath = /Applications/IntelliJ IDEA.app/Contents' >> ~/.gradle/gradle.properties
+
+# Option B — ad-hoc, per command
+./gradlew runIde -PlocalIdePath="/Applications/IntelliJ IDEA.app/Contents"
+```
+
+Other macOS path examples: `/Applications/IntelliJ IDEA CE.app/Contents` (Community), or under `~/Applications/JetBrains Toolbox/...` if you use Toolbox.
+
+CI builds intentionally leave this unset and let Gradle download the platform — see `.github/workflows/release.yml` for the `-PlocalIdePath=` override.
 
 ## Project layout
 
