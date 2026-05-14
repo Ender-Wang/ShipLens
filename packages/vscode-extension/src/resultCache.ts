@@ -37,6 +37,21 @@ export class ResultCache {
     }
   }
 
+  /**
+   * Drop every entry whose key starts with `prefix`. Used to invalidate all
+   * cached lines for a file (`<filePath>::`) or for a repo (`<repoRoot>/`).
+   */
+  deleteByPrefix(prefix: string): number {
+    let removed = 0;
+    for (const key of this.map.keys()) {
+      if (key.startsWith(prefix)) {
+        this.map.delete(key);
+        removed++;
+      }
+    }
+    return removed;
+  }
+
   clear(): void {
     this.map.clear();
   }

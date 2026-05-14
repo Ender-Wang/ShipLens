@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
-import { resolveLineRelease, type LineReleaseResult } from '@shiplens/core';
+import {
+  invalidateRepo,
+  resolveLineRelease,
+  type LineReleaseResult,
+} from '@shiplens/core';
 import { ShipLensStatusBar } from './statusBar.js';
 import { readConfig, type ShipLensConfig } from './config.js';
 import { RepoLookup } from './repoCache.js';
@@ -21,6 +25,14 @@ export class ShipLensController implements vscode.Disposable {
   private readonly repoLookup = new RepoLookup();
   private readonly resultCache = new ResultCache();
   private readonly disposables: vscode.Disposable[] = [];
+  /**
+   * One watcher per repo root. We arm a fs-watcher on `<repo>/.git/HEAD` and
+   * `<repo>/.git/refs/**` so that an out-of-band commit, branch switch, fetch,
+   * or tag push (none of which bump the editor's `doc.version`) busts our
+   * caches and the very next cursor event re-runs git instead of serving a
+   * stale verdict.
+   */
+  private readonly refWatchers = new Map<string, vscode.FileSystemWatcher>();
 
   private debounceTimer: NodeJS.Timeout | undefined;
   private lastQueryKey: string | undefined;
@@ -102,6 +114,7 @@ export class ShipLensController implements vscode.Disposable {
       this.statusBar.hide();
       return;
     }
+    this.ensureRefWatcher(repoRoot);
 
     const requestId = ++this.currentRequestId;
 
@@ -130,16 +143,70 @@ export class ShipLensController implements vscode.Disposable {
     }
 
     if (requestId !== this.currentRequestId) return; // stale
-    this.resultCache.set(cacheKey, result);
+    // Only memoize stable verdicts. `uncommitted` flips the moment the user
+    // commits; `unreleased` flips the moment a release tag is pushed; neither
+    // event bumps `doc.version`, so caching them risks the bug where the
+    // status bar keeps showing the pre-commit verdict until the user reloads.
+    if (isStableResult(result)) {
+      this.resultCache.set(cacheKey, result);
+    }
     this.statusBar.showResult(result);
+  }
+
+  /**
+   * Arm a watcher on `<repo>/.git/HEAD` and `<repo>/.git/refs/**` if we don't
+   * already have one. Refs change on commit, branch switch, fetch, pull, tag,
+   * push — every operation that can flip a previously-cached verdict.
+   */
+  private ensureRefWatcher(repoRoot: string): void {
+    if (this.refWatchers.has(repoRoot)) return;
+
+    // Glob captures HEAD (commits + branch switches) and any ref under refs/
+    // (tags, branches, stashes). We don't care which file changed; any change
+    // is enough to bust the per-line cache and the core's per-repo state.
+    const pattern = new vscode.RelativePattern(repoRoot, '.git/{HEAD,refs/**}');
+    const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+    const onRefChange = (): void => {
+      this.invalidateForRepo(repoRoot);
+      // Force the very next refresh, even if the cursor hasn't moved, by
+      // wiping `lastQueryKey`. Schedule with no delay so the user sees the
+      // new verdict as soon as their commit lands.
+      this.lastQueryKey = undefined;
+      this.scheduleRefresh(0);
+    };
+
+    watcher.onDidChange(onRefChange);
+    watcher.onDidCreate(onRefChange);
+    watcher.onDidDelete(onRefChange);
+
+    this.refWatchers.set(repoRoot, watcher);
+    this.disposables.push(watcher);
+  }
+
+  /** Drop every cached result for files under this repo + bust the core's tag index. */
+  private invalidateForRepo(repoRoot: string): void {
+    invalidateRepo(repoRoot);
+    // Result cache is keyed on absolute paths; clear everything under repoRoot.
+    // Cheap brute force — the cache caps at 200 entries.
+    this.resultCache.deleteByPrefix(`${repoRoot}/`);
   }
 
   dispose(): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer);
     for (const d of this.disposables) d.dispose();
+    this.refWatchers.clear();
     this.statusBar.dispose();
     this.resultCache.clear();
   }
+}
+
+function isStableResult(r: LineReleaseResult): boolean {
+  // `released` and `limited-history` have no failure mode that flips them
+  // without a ref change (which our watcher already busts). `not-tracked`
+  // also relies on the ref watcher (e.g. user runs `git add` on the file).
+  // `uncommitted` and `unreleased` are the volatile pair — see comment above.
+  return r.kind === 'released' || r.kind === 'limited-history' || r.kind === 'not-tracked';
 }
 
 function fingerprintConfig(config: ShipLensConfig): string {
