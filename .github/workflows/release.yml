@@ -5,27 +5,35 @@ name: Release
 #
 # The three editions ship and version independently — they're separate
 # platforms (Go binary, VSCode/Cursor extension, JetBrains plugin) and have
-# no reason to march in lockstep. So this workflow is *diff-driven*:
+# no reason to march in lockstep. The release model is:
 #
-#   1. You bump whichever edition's version file you actually changed:
+#   1. To ship an edition, bump *only* its version file:
 #        - CLI       → packages/cli/cmd/shiplens/main.go        (var Version)
 #        - VSCode    → packages/vscode-extension/package.json   ("version")
 #        - JetBrains → packages/jetbrains-plugin/gradle.properties (pluginVersion)
-#   2. You commit the change(s) and push a single `vX.Y.Z` tag.
+#      to the same X.Y.Z value as the tag you'll cut.
+#   2. Commit the bump(s) (alongside any source changes the release contains).
+#   3. Push a single `vX.Y.Z` tag.
 #
 # CI then:
-#   - Diffs the tagged commit against the previous `v*` tag.
-#   - Builds + uploads only the editions whose source paths changed.
-#   - Validates that each *built* edition's version file equals X.Y.Z.
-#   - Updates the Homebrew tap only if the CLI was rebuilt.
+#   - For each edition: ships it iff its version file (a) moved between the
+#     previous `v*` tag and the current one AND (b) currently equals X.Y.Z.
+#   - Updates the Homebrew tap only if the CLI was shipped.
 #
-# A `packages/core/` change counts as a VSCode change (the editor extension
-# imports @shiplens/core; the CLI and JetBrains plugins are independent
-# Go/Kotlin ports, so a core change does NOT force them to rebuild).
+# Why version-file-move (and not "any source change"): the version file is
+# the one path the maintainer deliberately moves at release time, so it's
+# the cleanest possible signal of "ship this". A diff over all of
+# `packages/<edition>/**` would re-flag every commit that touched the
+# edition during the interval between tags, even ones that were prep for
+# a future release.
 #
 # Edge cases:
-#   - First release ever (no previous v* tag): build all three editions.
-#   - Tag with no `packages/*` changes: fail the run — you've tagged a no-op.
+#   - First release ever (no previous `v*` tag): every edition whose
+#     version file currently equals X.Y.Z ships.
+#   - Tag with no edition matching the rule: fail the run loudly — you've
+#     tagged a no-op release.
+#   - Version file moved in the diff but the new value isn't X.Y.Z:
+#     treated as half-bumped prep for a *future* release, NOT shipped now.
 #
 # Marketplace publishes (VS Marketplace, Open VSX, JetBrains Marketplace)
 # remain out-of-band — `vsce publish`, `ovsx publish`, `gradle publishPlugin`
@@ -92,42 +100,63 @@ jobs:
           PREV_TAG=$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)
           echo "Previous tag: ${PREV_TAG:-<none — first release>}"
 
-          # 3. Compute the changed-paths set between $PREV_TAG and $TAG.
-          #    First-release case: treat everything under packages/ as changed.
-          if [ -z "$PREV_TAG" ]; then
-            echo "First release — building all editions whose package directory exists."
-            CHANGED_PATHS=$(ls -d packages/*/ 2>/dev/null | sed 's:/$::' || true)
-          else
-            CHANGED_PATHS=$(git diff --name-only "${PREV_TAG}..${TAG}")
-          fi
-
-          # 4. Map paths to edition build flags. A `packages/core/` change is
-          #    a VSCode change (the extension imports @shiplens/core); the CLI
-          #    and JetBrains plugins are independent ports and don't depend on
-          #    core's TypeScript.
-          BUILD_CLI=false
-          BUILD_VSCODE=false
-          BUILD_JETBRAINS=false
-          while IFS= read -r p; do
-            case "$p" in
-              packages/cli/*)              BUILD_CLI=true ;;
-              packages/vscode-extension/*) BUILD_VSCODE=true ;;
-              packages/core/*)             BUILD_VSCODE=true ;;
-              packages/jetbrains-plugin/*) BUILD_JETBRAINS=true ;;
-            esac
-          done <<< "$CHANGED_PATHS"
-
-          if [ "$BUILD_CLI" = "false" ] && [ "$BUILD_VSCODE" = "false" ] && [ "$BUILD_JETBRAINS" = "false" ]; then
-            echo "::error::No packages/* changes between ${PREV_TAG:-<root>} and $TAG. Tagging a no-op release is not allowed; tag the next functional change instead."
-            exit 1
-          fi
-
-          # 5. Read each edition's internal version from its source of truth.
+          # 3. Read each edition's current source-of-truth version.
           CLI_VERSION=$(grep '^var Version' packages/cli/cmd/shiplens/main.go \
             | sed 's/.*"\([^"]*\)".*/\1/')
           VSCODE_VERSION=$(node -p "require('./packages/vscode-extension/package.json').version")
           JETBRAINS_VERSION=$(grep '^pluginVersion' packages/jetbrains-plugin/gradle.properties \
             | sed 's/^pluginVersion[[:space:]]*=[[:space:]]*//')
+
+          # 4. Decide which editions to ship. The rule: an edition ships in
+          #    this release if and only if its version-file moved in
+          #    PREV_TAG..TAG AND its current value equals TAG_VERSION.
+          #
+          #    Why this rule (and not "did any source file change"):
+          #    diffing all of `packages/<edition>/**` is too broad — it
+          #    flags every commit that touched the edition during the
+          #    interval, even ones that were never meant for the current
+          #    release. The version file is the one path the maintainer
+          #    deliberately moves at release time, so it's the cleanest
+          #    possible signal of "ship this".
+          #
+          #    Edge cases:
+          #    - First release ever (no PREV_TAG): a version file is
+          #      "moved" iff it currently equals TAG_VERSION.
+          #    - Version file moved in the diff but the new value isn't
+          #      TAG_VERSION: that's a half-bumped state for a future
+          #      release; treat it as "not shipping" rather than failing,
+          #      so prep work can sit on main without blocking releases.
+          BUILD_CLI=false
+          BUILD_VSCODE=false
+          BUILD_JETBRAINS=false
+
+          version_file_moved() {
+            # Args: <path>
+            # Returns 0 if the path changed in PREV_TAG..TAG (or no prev tag).
+            local path="$1"
+            if [ -z "$PREV_TAG" ]; then
+              return 0
+            fi
+            git diff --name-only "${PREV_TAG}..${TAG}" -- "$path" | grep -q .
+          }
+
+          if version_file_moved 'packages/cli/cmd/shiplens/main.go' \
+              && [ "$CLI_VERSION" = "$TAG_VERSION" ]; then
+            BUILD_CLI=true
+          fi
+          if version_file_moved 'packages/vscode-extension/package.json' \
+              && [ "$VSCODE_VERSION" = "$TAG_VERSION" ]; then
+            BUILD_VSCODE=true
+          fi
+          if version_file_moved 'packages/jetbrains-plugin/gradle.properties' \
+              && [ "$JETBRAINS_VERSION" = "$TAG_VERSION" ]; then
+            BUILD_JETBRAINS=true
+          fi
+
+          if [ "$BUILD_CLI" = "false" ] && [ "$BUILD_VSCODE" = "false" ] && [ "$BUILD_JETBRAINS" = "false" ]; then
+            echo "::error::Tag $TAG ships nothing. No edition has both (a) its version file moved since ${PREV_TAG:-<root>} and (b) a current value of $TAG_VERSION. Bump the version file of the edition you want to release and re-tag."
+            exit 1
+          fi
 
           # 6. Release notes: HEAD commit body (skip first two lines = subject + blank).
           NOTES=$(git log -1 --pretty=%B | tail -n +3 || true)
@@ -153,42 +182,8 @@ jobs:
           echo "Build flags: cli=$BUILD_CLI vscode=$BUILD_VSCODE jb=$BUILD_JETBRAINS"
           echo "Internal versions: cli=$CLI_VERSION vscode=$VSCODE_VERSION jetbrains=$JETBRAINS_VERSION"
 
-  validate-versions:
-    needs: prepare
-    runs-on: ubuntu-latest
-    steps:
-      - name: Tag version must match each edition we're building
-        env:
-          TAG: ${{ needs.prepare.outputs.tag }}
-          TAG_VERSION: ${{ needs.prepare.outputs.tag_version }}
-          BUILD_CLI: ${{ needs.prepare.outputs.build_cli }}
-          BUILD_VSCODE: ${{ needs.prepare.outputs.build_vscode }}
-          BUILD_JETBRAINS: ${{ needs.prepare.outputs.build_jetbrains }}
-          CLI_VERSION: ${{ needs.prepare.outputs.cli_version }}
-          VSCODE_VERSION: ${{ needs.prepare.outputs.vscode_version }}
-          JETBRAINS_VERSION: ${{ needs.prepare.outputs.jetbrains_version }}
-        run: |
-          set -euo pipefail
-          fail=0
-          if [ "$BUILD_CLI" = "true" ] && [ "$CLI_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::Tag $TAG ships CLI but main.go has Version = \"$CLI_VERSION\" (expected $TAG_VERSION). Bump packages/cli/cmd/shiplens/main.go and re-tag."
-            fail=1
-          fi
-          if [ "$BUILD_VSCODE" = "true" ] && [ "$VSCODE_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::Tag $TAG ships VSCode but package.json has \"version\": \"$VSCODE_VERSION\" (expected $TAG_VERSION). Bump packages/vscode-extension/package.json and re-tag."
-            fail=1
-          fi
-          if [ "$BUILD_JETBRAINS" = "true" ] && [ "$JETBRAINS_VERSION" != "$TAG_VERSION" ]; then
-            echo "::error::Tag $TAG ships JetBrains but gradle.properties has pluginVersion = $JETBRAINS_VERSION (expected $TAG_VERSION). Bump packages/jetbrains-plugin/gradle.properties and re-tag."
-            fail=1
-          fi
-          if [ "$fail" = "1" ]; then
-            exit 1
-          fi
-          echo "All built editions agree with the tag."
-
   build-cli:
-    needs: [prepare, validate-versions]
+    needs: prepare
     if: needs.prepare.outputs.build_cli == 'true'
     runs-on: ubuntu-latest
     strategy:
@@ -260,7 +255,7 @@ jobs:
           retention-days: 7
 
   build-vscode:
-    needs: [prepare, validate-versions]
+    needs: prepare
     if: needs.prepare.outputs.build_vscode == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -300,7 +295,7 @@ jobs:
           retention-days: 7
 
   build-jetbrains:
-    needs: [prepare, validate-versions]
+    needs: prepare
     if: needs.prepare.outputs.build_jetbrains == 'true'
     runs-on: ubuntu-latest
     steps:
