@@ -1,32 +1,48 @@
 name: Release
 
 # Builds and releases ShipLens artifacts to GitHub Releases, then updates the
-# Homebrew tap. Designed to be the *offline* distribution path — VSCode and
-# JetBrains marketplace publishes still happen out-of-band (manually via
-# `vsce publish` / Gradle `publishPlugin`). Users who can't reach those
-# marketplaces can grab the .vsix / plugin .zip / `shiplens` binary here.
+# Homebrew tap (only when the CLI is part of the release).
 #
-# Triggers:
-#   workflow_dispatch  — manual run; optional `tag` input. Default reads CLI
-#                        version from packages/cli/cmd/shiplens/main.go and
-#                        produces tag `v<version>` (lockstep release).
-#   push of tag v*     — lockstep release (CLI + VSCode + JetBrains).
-#   push of tag cli-v* — CLI-only release (skips VSCode + JetBrains jobs).
+# The three editions ship and version independently — they're separate
+# platforms (Go binary, VSCode/Cursor extension, JetBrains plugin) and have
+# no reason to march in lockstep. So this workflow is *diff-driven*:
+#
+#   1. You bump whichever edition's version file you actually changed:
+#        - CLI       → packages/cli/cmd/shiplens/main.go        (var Version)
+#        - VSCode    → packages/vscode-extension/package.json   ("version")
+#        - JetBrains → packages/jetbrains-plugin/gradle.properties (pluginVersion)
+#   2. You commit the change(s) and push a single `vX.Y.Z` tag.
+#
+# CI then:
+#   - Diffs the tagged commit against the previous `v*` tag.
+#   - Builds + uploads only the editions whose source paths changed.
+#   - Validates that each *built* edition's version file equals X.Y.Z.
+#   - Updates the Homebrew tap only if the CLI was rebuilt.
+#
+# A `packages/core/` change counts as a VSCode change (the editor extension
+# imports @shiplens/core; the CLI and JetBrains plugins are independent
+# Go/Kotlin ports, so a core change does NOT force them to rebuild).
+#
+# Edge cases:
+#   - First release ever (no previous v* tag): build all three editions.
+#   - Tag with no `packages/*` changes: fail the run — you've tagged a no-op.
+#
+# Marketplace publishes (VS Marketplace, Open VSX, JetBrains Marketplace)
+# remain out-of-band — `vsce publish`, `ovsx publish`, `gradle publishPlugin`
+# from a maintainer's machine. CI is the offline distribution path only.
 #
 # Idempotency: softprops/action-gh-release upserts at `tag_name`. Re-running
-# at an existing tag updates the release assets in place.
+# the workflow on an existing tag updates the release assets in place.
 
 on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag to release at (e.g. v0.1.2 or cli-v0.1.3). Empty = read CLI version from main.go and use v<version>.'
-        required: false
-        default: ''
+        description: 'Tag to release at (e.g. v0.1.3). Must already exist.'
+        required: true
   push:
     tags:
       - 'v*'
-      - 'cli-v*'
 
 permissions:
   contents: write   # softprops/action-gh-release needs this to create releases
@@ -36,58 +52,84 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       tag: ${{ steps.compute.outputs.tag }}
-      version: ${{ steps.compute.outputs.version }}
+      tag_version: ${{ steps.compute.outputs.tag_version }}
       build_cli: ${{ steps.compute.outputs.build_cli }}
       build_vscode: ${{ steps.compute.outputs.build_vscode }}
       build_jetbrains: ${{ steps.compute.outputs.build_jetbrains }}
+      cli_version: ${{ steps.compute.outputs.cli_version }}
+      vscode_version: ${{ steps.compute.outputs.vscode_version }}
+      jetbrains_version: ${{ steps.compute.outputs.jetbrains_version }}
       release_notes: ${{ steps.compute.outputs.release_notes }}
     steps:
       - uses: actions/checkout@v6
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0   # full history needed for `git diff <prev-tag>..<tag>`
+          # workflow_dispatch checks out the default branch unless told
+          # otherwise; for tag-push events we want the tagged SHA. The
+          # expression below resolves to either the user-supplied tag or the
+          # tag that triggered the workflow.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - id: compute
         run: |
           set -euo pipefail
 
-          # Resolve tag.
+          # 1. Resolve which tag we're releasing at.
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            INPUT_TAG="${{ inputs.tag }}"
-            if [ -n "$INPUT_TAG" ]; then
-              TAG="$INPUT_TAG"
-            else
-              CLI_VERSION=$(grep '^var Version' packages/cli/cmd/shiplens/main.go \
-                | sed 's/.*"\([^"]*\)".*/\1/')
-              TAG="v$CLI_VERSION"
-            fi
+            TAG="${{ inputs.tag }}"
           else
             TAG="${GITHUB_REF#refs/tags/}"
           fi
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag provided." >&2
+            exit 1
+          fi
+          # Strip the `v` prefix to get the plain version.
+          TAG_VERSION="${TAG#v}"
 
-          # Strip prefix to get plain version (used by Formula, gradle, etc).
-          VERSION="$TAG"
-          VERSION="${VERSION#cli-}"
-          VERSION="${VERSION#v}"
+          # 2. Find the previous v* tag that's an ancestor of $TAG. Empty if
+          #    this is the first release ever.
+          PREV_TAG=$(git describe --tags --abbrev=0 --match 'v*' "${TAG}^" 2>/dev/null || true)
+          echo "Previous tag: ${PREV_TAG:-<none — first release>}"
 
-          # Decide which editions to build based on tag prefix.
-          case "$TAG" in
-            cli-v*)
-              BUILD_CLI=true
-              BUILD_VSCODE=false
-              BUILD_JETBRAINS=false
-              ;;
-            v*)
-              BUILD_CLI=true
-              BUILD_VSCODE=true
-              BUILD_JETBRAINS=true
-              ;;
-            *)
-              echo "Unrecognised tag format: $TAG" >&2
-              exit 1
-              ;;
-          esac
+          # 3. Compute the changed-paths set between $PREV_TAG and $TAG.
+          #    First-release case: treat everything under packages/ as changed.
+          if [ -z "$PREV_TAG" ]; then
+            echo "First release — building all editions whose package directory exists."
+            CHANGED_PATHS=$(ls -d packages/*/ 2>/dev/null | sed 's:/$::' || true)
+          else
+            CHANGED_PATHS=$(git diff --name-only "${PREV_TAG}..${TAG}")
+          fi
 
-          # Release notes: HEAD commit body (skip first two lines = subject + blank).
-          # Mirrors EdgeMark's pattern.
+          # 4. Map paths to edition build flags. A `packages/core/` change is
+          #    a VSCode change (the extension imports @shiplens/core); the CLI
+          #    and JetBrains plugins are independent ports and don't depend on
+          #    core's TypeScript.
+          BUILD_CLI=false
+          BUILD_VSCODE=false
+          BUILD_JETBRAINS=false
+          while IFS= read -r p; do
+            case "$p" in
+              packages/cli/*)              BUILD_CLI=true ;;
+              packages/vscode-extension/*) BUILD_VSCODE=true ;;
+              packages/core/*)             BUILD_VSCODE=true ;;
+              packages/jetbrains-plugin/*) BUILD_JETBRAINS=true ;;
+            esac
+          done <<< "$CHANGED_PATHS"
+
+          if [ "$BUILD_CLI" = "false" ] && [ "$BUILD_VSCODE" = "false" ] && [ "$BUILD_JETBRAINS" = "false" ]; then
+            echo "::error::No packages/* changes between ${PREV_TAG:-<root>} and $TAG. Tagging a no-op release is not allowed; tag the next functional change instead."
+            exit 1
+          fi
+
+          # 5. Read each edition's internal version from its source of truth.
+          CLI_VERSION=$(grep '^var Version' packages/cli/cmd/shiplens/main.go \
+            | sed 's/.*"\([^"]*\)".*/\1/')
+          VSCODE_VERSION=$(node -p "require('./packages/vscode-extension/package.json').version")
+          JETBRAINS_VERSION=$(grep '^pluginVersion' packages/jetbrains-plugin/gradle.properties \
+            | sed 's/^pluginVersion[[:space:]]*=[[:space:]]*//')
+
+          # 6. Release notes: HEAD commit body (skip first two lines = subject + blank).
           NOTES=$(git log -1 --pretty=%B | tail -n +3 || true)
           if [ -z "$NOTES" ]; then
             NOTES="Release $TAG"
@@ -95,19 +137,58 @@ jobs:
 
           {
             echo "tag=$TAG"
-            echo "version=$VERSION"
+            echo "tag_version=$TAG_VERSION"
             echo "build_cli=$BUILD_CLI"
             echo "build_vscode=$BUILD_VSCODE"
             echo "build_jetbrains=$BUILD_JETBRAINS"
+            echo "cli_version=$CLI_VERSION"
+            echo "vscode_version=$VSCODE_VERSION"
+            echo "jetbrains_version=$JETBRAINS_VERSION"
             echo "release_notes<<EOF"
             echo "$NOTES"
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-          echo "Resolved: tag=$TAG version=$VERSION cli=$BUILD_CLI vscode=$BUILD_VSCODE jb=$BUILD_JETBRAINS"
+          echo "Resolved: tag=$TAG tag_version=$TAG_VERSION"
+          echo "Build flags: cli=$BUILD_CLI vscode=$BUILD_VSCODE jb=$BUILD_JETBRAINS"
+          echo "Internal versions: cli=$CLI_VERSION vscode=$VSCODE_VERSION jetbrains=$JETBRAINS_VERSION"
+
+  validate-versions:
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Tag version must match each edition we're building
+        env:
+          TAG: ${{ needs.prepare.outputs.tag }}
+          TAG_VERSION: ${{ needs.prepare.outputs.tag_version }}
+          BUILD_CLI: ${{ needs.prepare.outputs.build_cli }}
+          BUILD_VSCODE: ${{ needs.prepare.outputs.build_vscode }}
+          BUILD_JETBRAINS: ${{ needs.prepare.outputs.build_jetbrains }}
+          CLI_VERSION: ${{ needs.prepare.outputs.cli_version }}
+          VSCODE_VERSION: ${{ needs.prepare.outputs.vscode_version }}
+          JETBRAINS_VERSION: ${{ needs.prepare.outputs.jetbrains_version }}
+        run: |
+          set -euo pipefail
+          fail=0
+          if [ "$BUILD_CLI" = "true" ] && [ "$CLI_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $TAG ships CLI but main.go has Version = \"$CLI_VERSION\" (expected $TAG_VERSION). Bump packages/cli/cmd/shiplens/main.go and re-tag."
+            fail=1
+          fi
+          if [ "$BUILD_VSCODE" = "true" ] && [ "$VSCODE_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $TAG ships VSCode but package.json has \"version\": \"$VSCODE_VERSION\" (expected $TAG_VERSION). Bump packages/vscode-extension/package.json and re-tag."
+            fail=1
+          fi
+          if [ "$BUILD_JETBRAINS" = "true" ] && [ "$JETBRAINS_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Tag $TAG ships JetBrains but gradle.properties has pluginVersion = $JETBRAINS_VERSION (expected $TAG_VERSION). Bump packages/jetbrains-plugin/gradle.properties and re-tag."
+            fail=1
+          fi
+          if [ "$fail" = "1" ]; then
+            exit 1
+          fi
+          echo "All built editions agree with the tag."
 
   build-cli:
-    needs: prepare
+    needs: [prepare, validate-versions]
     if: needs.prepare.outputs.build_cli == 'true'
     runs-on: ubuntu-latest
     strategy:
@@ -121,6 +202,8 @@ jobs:
           - { goos: windows, goarch: amd64, ext: zip    }
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
       - uses: actions/setup-go@v6
         with:
           go-version: '1.23'
@@ -133,7 +216,9 @@ jobs:
         run: |
           set -euo pipefail
           cd packages/cli
-          VERSION="${{ needs.prepare.outputs.version }}"
+          # main.go is the source of truth for the binary's reported version.
+          # validate-versions has already confirmed it equals tag_version.
+          VERSION="${{ needs.prepare.outputs.cli_version }}"
           TAG="${{ needs.prepare.outputs.tag }}"
 
           BIN="shiplens"
@@ -143,6 +228,8 @@ jobs:
 
           mkdir -p out
           # -trimpath: reproducible builds. -s -w: smaller binary (strip debug).
+          # -X main.Version baked at link time so `shiplens version` agrees
+          # with what's printed on the release page (main.go is the source).
           go build \
             -trimpath \
             -ldflags "-s -w -X main.Version=$VERSION" \
@@ -157,7 +244,7 @@ jobs:
             tar -czf "$ARCHIVE" -C out "$BIN"
           fi
 
-          # `<sha>  <filename>` form, matches EdgeMark and `shasum -c` convention.
+          # `<sha>  <filename>` form, matches `shasum -c` convention.
           shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
 
           ls -lh "$ARCHIVE" "$ARCHIVE.sha256"
@@ -173,11 +260,13 @@ jobs:
           retention-days: 7
 
   build-vscode:
-    needs: prepare
+    needs: [prepare, validate-versions]
     if: needs.prepare.outputs.build_vscode == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - uses: actions/setup-node@v6
         with:
@@ -211,11 +300,13 @@ jobs:
           retention-days: 7
 
   build-jetbrains:
-    needs: prepare
+    needs: [prepare, validate-versions]
     if: needs.prepare.outputs.build_jetbrains == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - uses: actions/setup-java@v5
         with:
@@ -255,13 +346,14 @@ jobs:
 
   release:
     needs: [prepare, build-cli, build-vscode, build-jetbrains]
-    # Run after the build jobs that *should* have run finished without failing.
-    # Skipped jobs (e.g. vscode/jb on a cli-only tag) don't trigger failure().
+    # Skipped jobs (editions whose source didn't change) don't trigger failure().
     if: always() && !cancelled() && !failure()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - uses: actions/download-artifact@v7
         with:
@@ -284,7 +376,7 @@ jobs:
 
   update-tap:
     needs: [prepare, release]
-    # Update the Homebrew tap whenever a CLI build was produced.
+    # Update the Homebrew tap only when the CLI was rebuilt in this release.
     if: needs.prepare.outputs.build_cli == 'true'
     runs-on: ubuntu-latest
     steps:
@@ -314,7 +406,7 @@ jobs:
         env:
           TAP_TOKEN: ${{ secrets.TAP_GITHUB_TOKEN }}
           TAG: ${{ needs.prepare.outputs.tag }}
-          VERSION: ${{ needs.prepare.outputs.version }}
+          VERSION: ${{ needs.prepare.outputs.cli_version }}
         run: |
           set -euo pipefail
 
