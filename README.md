@@ -11,7 +11,7 @@
 [![VS Marketplace](https://img.shields.io/github/package-json/v/Ender-Wang/ShipLens?filename=packages%2Fvscode-extension%2Fpackage.json&label=VS%20Marketplace&color=007ACC&logo=visualstudiocode&logoColor=white)](https://marketplace.visualstudio.com/items?itemName=Ender-Wang.shiplens)
 [![Open VSX](https://img.shields.io/open-vsx/v/Ender-Wang/shiplens?label=Open%20VSX&color=A60EE5)](https://open-vsx.org/extension/Ender-Wang/shiplens)
 [![JetBrains](https://img.shields.io/jetbrains/plugin/v/31705?label=JetBrains&color=FE2857)](https://plugins.jetbrains.com/plugin/31705-shiplens)
-[![Homebrew](https://img.shields.io/github/v/release/Ender-Wang/ShipLens?label=Homebrew&color=FBB040&logo=homebrew&logoColor=white)](https://github.com/Ender-Wang/homebrew-tap)
+[![Homebrew](https://img.shields.io/badge/dynamic/regex?url=https%3A%2F%2Fraw.githubusercontent.com%2FEnder-Wang%2Fhomebrew-tap%2Fmain%2FFormula%2Fshiplens.rb&search=version%20%22%28%5Cd%2B%5C.%5Cd%2B%5C.%5Cd%2B%29%22&replace=v%241&label=Homebrew&color=FBB040&logo=homebrew&logoColor=white)](https://github.com/Ender-Wang/homebrew-tap)
 [![License: MIT](https://img.shields.io/github/license/Ender-Wang/ShipLens)](./LICENSE)
 
 </div>
